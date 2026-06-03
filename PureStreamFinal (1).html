@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PureStream • Interactive Dashboard</title>
+    
+    <!-- CDNs for Tailwind, FontAwesome, and Chart.js -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <!-- Tailwind Custom Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        turquoise: {
+                            DEFAULT: '#00E5FF',
+                            dark: '#00B3CC',
+                            light: '#E0FAFF',
+                            glow: 'rgba(0, 229, 255, 0.4)'
+                        },
+                        pureblack: '#0A0A0A',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        display: ['Space Grotesk', 'Inter', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'turquoise': '0 4px 14px 0 rgba(0, 229, 255, 0.39)',
+                        'black': '0 4px 14px 0 rgba(0, 0, 0, 0.2)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+        
+        body {
+            background-color: #FAFAFA;
+            color: #0A0A0A;
+            overflow-x: hidden;
+        }
+
+        .font-display {
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+        }
+
+        .section-header {
+            font-size: 2.5rem;
+            line-height: 1.1;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+        }
+
+        /* SPA Page Transition Logic */
+        .section-page {
+            display: none;
+            opacity: 0;
+        }
+        .section-page.active {
+            display: block;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Nav active state */
+        .nav-btn {
+            transition: all 0.2s ease;
+        }
+        .nav-btn.active {
+            background-color: #0A0A0A !important;
+            color: #00E5FF !important;
+            font-weight: 600;
+        }
+
+        /* High contrast cards */
+        .modern-card {
+            background: #FFFFFF;
+            border: 2px solid #E5E7EB;
+            transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+        }
+        .modern-card:hover {
+            transform: translateY(-4px);
+            border-color: #00E5FF;
+            box-shadow: 0 10px 30px -10px rgba(0, 229, 255, 0.3);
+        }
+
+        .turquoise-gradient {
+            background: linear-gradient(90deg, #00B3CC, #00E5FF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .metric-card {
+            background: #FFFFFF;
+            border: 1px solid #E5E7EB;
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-2px);
+            border-color: #0A0A0A;
+        }
+
+        .example-card {
+            background: #FFFFFF;
+            border: 2px solid #E5E7EB;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        
+        .progress-bar-inner {
+            transition: width 1.5s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.5s ease;
+        }
+
+        /* Task Log animations */
+        .log-entry {
+            animation: slideInLeft 0.3s ease-out forwards;
+            border-left: 3px solid #00E5FF;
+        }
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Custom Toast */
+        #toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            background: #0A0A0A;
+            color: #FFFFFF;
+            padding: 16px 24px;
+            border-radius: 8px;
+            border-left: 4px solid #00E5FF;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            transform: translateX(120%);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .toast.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        /* Scanning overlay */
+        #scan-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,255,255,0.95);
+            z-index: 9999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        .scan-line {
+            width: 100%;
+            height: 4px;
+            background: #00E5FF;
+            box-shadow: 0 0 15px #00E5FF;
+            position: absolute;
+            animation: scan 2s linear infinite;
+        }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+    </style>
+</head>
+<body class="antialiased selection:bg-turquoise selection:text-black min-h-screen flex flex-col">
+
+    <div id="toast-container"></div>
+
+    <div id="scan-overlay">
+        <div class="scan-line"></div>
+        <div class="text-4xl text-turquoise mb-4"><i class="fa-solid fa-satellite-dish fa-spin"></i></div>
+        <h2 class="font-display font-bold text-2xl text-pureblack mb-2">Running Global Deep Scan...</h2>
+        <p class="text-gray-500 font-mono text-sm" id="scan-text">Analyzing 47,892 queries against baseline anomalies</p>
+    </div>
+
+    <!-- Main Navigation -->
+    <nav class="border-b border-gray-200 bg-white sticky top-0 z-50">
+        <div class="max-w-screen-2xl mx-auto">
+            <div class="px-8 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-x-4">
+                    <div class="flex items-center gap-x-3 cursor-pointer" onclick="switchTab('home-section')">
+                        <div class="w-10 h-10 bg-pureblack rounded-xl flex items-center justify-center shadow-black">
+                            <i class="fa-solid fa-shield-halved text-turquoise text-2xl"></i>
+                        </div>
+                        <div>
+                            <span class="font-display text-2xl font-bold tracking-tight text-pureblack">PureStream</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-x-1">
+                    <div class="hidden lg:flex items-center text-sm font-medium text-gray-600 gap-x-1 p-1 bg-gray-50 rounded-lg border border-gray-200">
+                        <button onclick="switchTab('home-section')" id="nav-home-section" class="nav-btn px-4 py-2 rounded-md hover:bg-gray-200 transition-colors active">Overview</button>
+                        <button onclick="switchTab('how-it-works-section')" id="nav-how-it-works-section" class="nav-btn px-4 py-2 rounded-md hover:bg-gray-200 transition-colors">How it Works</button>
+                        <button onclick="switchTab('tasks-section')" id="nav-tasks-section" class="nav-btn px-4 py-2 rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2"><i class="fa-solid fa-bolt text-turquoise-dark"></i> Interactive Tasks</button>
+                        <button onclick="switchTab('dashboard-section')" id="nav-dashboard-section" class="nav-btn px-4 py-2 rounded-md hover:bg-gray-200 transition-colors">Live Dashboard</button>
+                        <button onclick="switchTab('analytics-section')" id="nav-analytics-section" class="nav-btn px-4 py-2 rounded-md hover:bg-gray-200 transition-colors">Analytics</button>
+                    </div>
+                    
+                    <div class="flex items-center gap-x-4 pl-6 ml-2 border-l border-gray-200">
+                        <div class="hidden sm:flex items-center gap-x-2 bg-turquoise-light px-3 py-1.5 rounded-full border border-turquoise">
+                            <div class="w-2 h-2 bg-turquoise-dark rounded-full animate-pulse"></div>
+                            <span class="text-xs font-bold text-turquoise-dark tracking-wide">SYSTEM ONLINE</span>
+                        </div>
+                        <button onclick="simulateGlobalDetection()" class="px-5 py-2.5 bg-pureblack hover:bg-gray-800 transition-colors text-white text-sm font-semibold rounded-lg flex items-center gap-x-2 shadow-black">
+                            <i class="fa-solid fa-radar text-turquoise"></i>
+                            <span>Scan Now</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="flex-grow">
+        
+        <!-- ========================================== -->
+        <!-- 1. HOME SECTION -->
+        <!-- ========================================== -->
+        <div id="home-section" class="section-page active max-w-screen-2xl mx-auto px-8 pt-20 pb-16">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+                <div class="lg:col-span-7 space-y-8">
+                    <div class="inline-flex items-center gap-x-2 bg-white border border-gray-200 rounded-full px-4 py-1.5 text-sm shadow-sm">
+                        <div class="px-2.5 py-0.5 bg-turquoise text-pureblack text-xs font-bold rounded-full flex items-center">
+                            <i class="fa-solid fa-rocket mr-1.5"></i> NEW
+                        </div>
+                        <span class="text-gray-600 font-medium">Real-time NLP Context Engine v3.0</span>
+                    </div>
+                    
+                    <div>
+                        <h1 class="text-6xl md:text-7xl font-display font-bold tracking-tighter leading-[1.05] text-pureblack">
+                            PureStream<br>
+                            <span class="turquoise-gradient">eliminates</span> keyword<br>
+                            hijacks instantly.
+                        </h1>
+                        <p class="mt-6 max-w-xl text-lg text-gray-600 leading-relaxed">
+                            The intelligent data sanitation layer built exclusively for Meltwater. It intercepts irrelevant viral noise before it pollutes your client dashboards. Zero manual cleanup required.
+                        </p>
+                    </div>
+                    
+                    <div class="flex flex-wrap items-center gap-4">
+                        <button onclick="switchTab('tasks-section')" 
+                                class="px-8 py-4 bg-turquoise hover:bg-turquoise-dark transition-all text-pureblack font-bold rounded-xl flex items-center gap-x-3 shadow-turquoise text-lg">
+                            <span>Start Interactive Demo</span>
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                        <button onclick="switchTab('how-it-works-section')" 
+                                class="px-8 py-4 bg-white border-2 border-gray-200 hover:border-pureblack transition-all text-pureblack font-bold rounded-xl flex items-center gap-x-3 text-lg">
+                            <span>See How it Works</span>
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center gap-x-12 pt-6 border-t border-gray-200 mt-8">
+                        <div>
+                            <div class="text-4xl font-display font-bold text-pureblack tabular-nums" id="hero-blocked">98,742</div>
+                            <div class="text-sm font-medium text-gray-500 mt-1 uppercase tracking-wider">Hijacks Blocked Today</div>
+                        </div>
+                        <div>
+                            <div class="text-4xl font-display font-bold text-pureblack tabular-nums" id="hero-brands">312</div>
+                            <div class="text-sm font-medium text-gray-500 mt-1 uppercase tracking-wider">Brands Protected</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="lg:col-span-5">
+                    <div class="relative bg-white border-2 border-pureblack rounded-2xl p-8 overflow-hidden shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-turquoise"></div>
+                        <div class="absolute top-6 right-6 px-3 py-1 bg-pureblack text-turquoise text-xs font-mono font-bold rounded flex items-center">
+                            <i class="fa-solid fa-circle-dot animate-pulse mr-2"></i> LIVE DATA
+                        </div>
+                        
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-end mt-4">
+                                <div>
+                                    <div class="text-xs font-bold text-gray-400 tracking-widest uppercase mb-1">Global Integrity Score</div>
+                                    <div class="text-6xl font-display font-bold tabular-nums text-pureblack">99.4<span class="text-3xl text-gray-400">%</span></div>
+                                </div>
+                            </div>
+                            
+                            <div class="h-3 bg-gray-100 rounded-full overflow-hidden border border-gray-200">
+                                <div class="h-full bg-turquoise w-[99.4%]"></div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-4 text-left pt-2">
+                                <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                                    <div class="text-pureblack text-xl mb-2"><i class="fa-solid fa-filter"></i></div>
+                                    <div class="text-2xl font-bold font-mono text-pureblack" id="hero-cleaned">4.2M</div>
+                                    <div class="text-xs font-medium text-gray-500 uppercase">Mentions Cleaned</div>
+                                </div>
+                                <div class="bg-turquoise-light border border-turquoise rounded-xl p-4">
+                                    <div class="text-turquoise-dark text-xl mb-2"><i class="fa-solid fa-bolt"></i></div>
+                                    <div class="text-2xl font-bold font-mono text-pureblack">14s</div>
+                                    <div class="text-xs font-medium text-turquoise-dark uppercase">Avg Resolution Time</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 2. HOW IT WORKS SECTION -->
+        <!-- ========================================== -->
+        <div id="how-it-works-section" class="section-page max-w-screen-2xl mx-auto px-8 py-16">
+            <div class="text-center mb-16 max-w-3xl mx-auto">
+                <span class="px-4 py-1 bg-pureblack text-turquoise text-xs font-bold rounded-full uppercase tracking-wider">Architecture</span>
+                <h2 class="section-header mt-6 text-pureblack">The 4-Step Intelligent Shield</h2>
+                <p class="mt-4 text-gray-600 text-lg">PureStream sits between the raw social firehose and the client dashboard, acting as a smart filter that uses Natural Language Processing to detect contextual anomalies.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
+                <!-- Connecting Line for Desktop -->
+                <div class="hidden md:block absolute top-1/2 left-1/2 w-full h-1 bg-gray-200 -translate-x-1/2 -translate-y-1/2 z-0"></div>
+                <div class="hidden md:block absolute top-1/2 left-1/2 w-1 h-full bg-gray-200 -translate-x-1/2 -translate-y-1/2 z-0"></div>
+
+                <!-- Step 1 -->
+                <div class="modern-card p-8 rounded-2xl relative z-10">
+                    <div class="w-14 h-14 bg-pureblack text-turquoise rounded-xl flex items-center justify-center text-2xl font-bold mb-6 shadow-black">1</div>
+                    <h3 class="text-2xl font-display font-bold text-pureblack mb-3">High-Volume Ingest</h3>
+                    <p class="text-gray-600 leading-relaxed mb-4">PureStream continuously monitors the live social firehose. It establishes a moving baseline of normal mention volume for every single client query.</p>
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-mono text-gray-500">
+                        <i class="fa-solid fa-wave-square mr-2"></i> Baseline for "Oasis": 200 mentions/day
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="modern-card p-8 rounded-2xl relative z-10">
+                    <div class="w-14 h-14 bg-pureblack text-turquoise rounded-xl flex items-center justify-center text-2xl font-bold mb-6 shadow-black">2</div>
+                    <h3 class="text-2xl font-display font-bold text-pureblack mb-3">Automated Spike Detection</h3>
+                    <p class="text-gray-600 leading-relaxed mb-4">When a keyword goes viral for the wrong reasons, the system instantly flags the exponential anomaly using dynamic statistical thresholds.</p>
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-sm font-mono text-red-600 font-bold">
+                        <i class="fa-solid fa-arrow-trend-up mr-2"></i> Alert: Volume spiked to 500,000/hr
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="modern-card p-8 rounded-2xl relative z-10">
+                    <div class="w-14 h-14 bg-pureblack text-turquoise rounded-xl flex items-center justify-center text-2xl font-bold mb-6 shadow-black">3</div>
+                    <h3 class="text-2xl font-display font-bold text-pureblack mb-3">Contextual NLP Scoring</h3>
+                    <p class="text-gray-600 leading-relaxed mb-4">Our NLP engine reads the surrounding text of the spike. It compares the new data against the client's historical brand context.</p>
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm font-mono text-gray-600 flex flex-col gap-2">
+                        <div><span class="text-green-600">Expected:</span> "firewall", "cloud", "B2B"</div>
+                        <div><span class="text-red-600">Found:</span> "tickets", "concert", "gallagher"</div>
+                        <div class="border-t border-gray-200 pt-2 font-bold text-pureblack">Result: Low Confidence (2%)</div>
+                    </div>
+                </div>
+
+                <!-- Step 4 -->
+                <div class="modern-card p-8 rounded-2xl relative z-10">
+                    <div class="w-14 h-14 bg-turquoise text-pureblack rounded-xl flex items-center justify-center text-2xl font-bold mb-6 shadow-turquoise">4</div>
+                    <h3 class="text-2xl font-display font-bold text-pureblack mb-3">One-Click Resolution</h3>
+                    <p class="text-gray-600 leading-relaxed mb-4">Low-confidence data is quarantined. Analysts get a clear alert to "Approve" or "Block". PureStream auto-generates the boolean exclusion rules.</p>
+                    <div class="bg-pureblack border border-pureblack rounded-lg p-3 text-sm font-mono text-turquoise">
+                        > GENERATED: NOT ("tickets" OR "concert")<br>
+                        > STATUS: Applied. Dashboard Clean.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-center mt-12">
+                <button onclick="switchTab('tasks-section')" class="px-8 py-3 bg-pureblack text-white font-bold rounded-lg hover:bg-gray-800 transition-colors">Try it Live <i class="fa-solid fa-arrow-right ml-2 text-turquoise"></i></button>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 3. INTERACTIVE TASKS SECTION -->
+        <!-- ========================================== -->
+        <div id="tasks-section" class="section-page max-w-screen-2xl mx-auto px-8 py-16">
+            
+            <div class="bg-pureblack text-white rounded-3xl p-10 lg:p-12 shadow-2xl relative overflow-hidden mb-8">
+                <!-- Background decorative elements -->
+                <div class="absolute top-0 right-0 w-96 h-96 bg-turquoise opacity-10 blur-[100px] rounded-full"></div>
+                <div class="absolute bottom-0 left-0 w-96 h-96 bg-turquoise opacity-10 blur-[100px] rounded-full"></div>
+
+                <div class="text-center mb-12 relative z-10">
+                    <span class="px-4 py-1 bg-white text-pureblack text-xs font-bold rounded-full uppercase tracking-wider">Live Task Simulation</span>
+                    <h2 class="section-header mt-6 text-white">Experience One-Click Resolution</h2>
+                    <p class="mt-4 max-w-2xl mx-auto text-gray-400 text-lg">The NLP engine has quarantined 3 massive data spikes. Click <span class="text-turquoise font-bold">RESOLVE</span> on a task below to neutralize the hijack and view the system's logic.</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-10">
+                    
+                    <!-- Task 1: Oasis -->
+                    <div class="example-card bg-gray-900 border-gray-800 rounded-2xl overflow-hidden" id="example-oasis">
+                        <div class="px-6 pt-6 pb-5">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <div class="font-bold text-xl text-white">Oasis Cybersecurity</div>
+                                    <div class="text-sm text-gray-400">B2B Security Software</div>
+                                </div>
+                                <div id="oasis-badge" class="px-3 py-1 bg-red-500 text-white text-xs rounded font-bold uppercase tracking-wide animate-pulse">Critical Spike</div>
+                            </div>
+                            
+                            <div class="my-8">
+                                <div class="flex justify-between text-sm mb-2 font-medium">
+                                    <div class="text-gray-300">Mention Volume</div>
+                                    <div class="font-mono text-white"><span id="oasis-volume">512,840</span> <span class="text-xs text-gray-500">/hr</span></div>
+                                </div>
+                                <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                    <div id="oasis-bar" class="progress-bar-inner h-full bg-red-500 w-[98%]"></div>
+                                </div>
+                                <div class="flex justify-between mt-2 text-xs font-mono">
+                                    <div class="text-gray-400">Baseline: 200/day</div>
+                                    <div id="oasis-multiplier" class="text-red-400 font-bold">+2,564x anomaly</div>
+                                </div>
+                            </div>
+                            
+                            <div id="oasis-trigger" class="text-sm bg-gray-800 border border-gray-700 p-4 rounded-xl mb-6">
+                                <div class="font-mono text-[11px] text-turquoise uppercase font-bold mb-1"><i class="fa-solid fa-microchip mr-1"></i> Issue Detected:</div>
+                                <div class="text-gray-200">Context shifted from "firewalls" to "concert tickets" & "gallagher".</div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between mt-auto pt-2 border-t border-gray-800">
+                                <div class="text-sm">
+                                    <span class="text-gray-400">Relevance:</span> 
+                                    <span id="oasis-confidence" class="font-mono text-red-400 font-bold ml-1">2%</span>
+                                </div>
+                                <button id="btn-oasis" onclick="resolveExampleTask('oasis', 512840, 200, 'NOT (tickets OR concert OR gallagher OR tour)')" class="px-6 py-2.5 bg-turquoise hover:bg-white transition-colors text-pureblack text-sm rounded font-bold flex items-center gap-x-2">
+                                    <i class="fa-solid fa-shield-halved"></i> <span>RESOLVE</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Task 2: Mars -->
+                    <div class="example-card bg-gray-900 border-gray-800 rounded-2xl overflow-hidden" id="example-mars">
+                        <div class="px-6 pt-6 pb-5">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <div class="font-bold text-xl text-white">NASA Mars Mission</div>
+                                    <div class="text-sm text-gray-400">Space Exploration</div>
+                                </div>
+                                <div id="mars-badge" class="px-3 py-1 bg-orange-500 text-white text-xs rounded font-bold uppercase tracking-wide">High Risk</div>
+                            </div>
+                            
+                            <div class="my-8">
+                                <div class="flex justify-between text-sm mb-2 font-medium">
+                                    <div class="text-gray-300">Mention Volume</div>
+                                    <div class="font-mono text-white"><span id="mars-volume">47,920</span> <span class="text-xs text-gray-500">/hr</span></div>
+                                </div>
+                                <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                    <div id="mars-bar" class="progress-bar-inner h-full bg-orange-500 w-[75%]"></div>
+                                </div>
+                                <div class="flex justify-between mt-2 text-xs font-mono">
+                                    <div class="text-gray-400">Baseline: 1,200/day</div>
+                                    <div id="mars-multiplier" class="text-orange-400 font-bold">+40x anomaly</div>
+                                </div>
+                            </div>
+                            
+                            <div id="mars-trigger" class="text-sm bg-gray-800 border border-gray-700 p-4 rounded-xl mb-6">
+                                <div class="font-mono text-[11px] text-turquoise uppercase font-bold mb-1"><i class="fa-solid fa-microchip mr-1"></i> Issue Detected:</div>
+                                <div class="text-gray-200">Sudden influx of "chocolate bar" and viral meme keywords detected.</div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between mt-auto pt-2 border-t border-gray-800">
+                                <div class="text-sm">
+                                    <span class="text-gray-400">Relevance:</span> 
+                                    <span id="mars-confidence" class="font-mono text-orange-400 font-bold ml-1">14%</span>
+                                </div>
+                                <button id="btn-mars" onclick="resolveExampleTask('mars', 47920, 1200, 'NOT (chocolate OR candy OR bar OR caramel)')" class="px-6 py-2.5 bg-turquoise hover:bg-white transition-colors text-pureblack text-sm rounded font-bold flex items-center gap-x-2">
+                                    <i class="fa-solid fa-shield-halved"></i> <span>RESOLVE</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Task 3: Apple -->
+                    <div class="example-card bg-gray-900 border-gray-800 rounded-2xl overflow-hidden" id="example-apple">
+                        <div class="px-6 pt-6 pb-5">
+                            <div class="flex items-start justify-between">
+                                <div>
+                                    <div class="font-bold text-xl text-white">Apple Orchards Inc.</div>
+                                    <div class="text-sm text-gray-400">Agriculture & Farming</div>
+                                </div>
+                                <div id="apple-badge" class="px-3 py-1 bg-yellow-500 text-pureblack text-xs rounded font-bold uppercase tracking-wide">Medium Risk</div>
+                            </div>
+                            
+                            <div class="my-8">
+                                <div class="flex justify-between text-sm mb-2 font-medium">
+                                    <div class="text-gray-300">Mention Volume</div>
+                                    <div class="font-mono text-white"><span id="apple-volume">18,340</span> <span class="text-xs text-gray-500">/hr</span></div>
+                                </div>
+                                <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+                                    <div id="apple-bar" class="progress-bar-inner h-full bg-yellow-500 w-[50%]"></div>
+                                </div>
+                                <div class="flex justify-between mt-2 text-xs font-mono">
+                                    <div class="text-gray-400">Baseline: 300/day</div>
+                                    <div id="apple-multiplier" class="text-yellow-500 font-bold">+61x anomaly</div>
+                                </div>
+                            </div>
+                            
+                            <div id="apple-trigger" class="text-sm bg-gray-800 border border-gray-700 p-4 rounded-xl mb-6">
+                                <div class="font-mono text-[11px] text-turquoise uppercase font-bold mb-1"><i class="fa-solid fa-microchip mr-1"></i> Issue Detected:</div>
+                                <div class="text-gray-200">Mentions heavily indexing on "iPhone 16 announcement" and "iOS update".</div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between mt-auto pt-2 border-t border-gray-800">
+                                <div class="text-sm">
+                                    <span class="text-gray-400">Relevance:</span> 
+                                    <span id="apple-confidence" class="font-mono text-yellow-500 font-bold ml-1">8%</span>
+                                </div>
+                                <button id="btn-apple" onclick="resolveExampleTask('apple', 18340, 300, 'NOT (iphone OR ios OR macbook OR tim cook)')" class="px-6 py-2.5 bg-turquoise hover:bg-white transition-colors text-pureblack text-sm rounded font-bold flex items-center gap-x-2">
+                                    <i class="fa-solid fa-shield-halved"></i> <span>RESOLVE</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LIVE EXECUTION LOG EXPLANATION -->
+            <div class="mt-8 bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
+                <div class="flex items-center justify-between border-b border-gray-100 pb-4 mb-6">
+                    <h3 class="font-display font-bold text-2xl text-pureblack flex items-center gap-3">
+                        <i class="fa-solid fa-terminal text-gray-400"></i> PureStream Execution Log
+                    </h3>
+                    <div class="text-sm font-mono bg-gray-100 text-gray-600 px-3 py-1 rounded">System Mode: Detailed</div>
+                </div>
+                
+                <div id="execution-log" class="space-y-4 font-mono text-sm">
+                    <div class="text-gray-400 italic" id="empty-log-msg">Waiting for task execution... Click "RESOLVE" on any card above to see how PureStream sanitizes data in real-time.</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 4. LIVE DASHBOARD SECTION -->
+        <!-- ========================================== -->
+        <div id="dashboard-section" class="section-page max-w-screen-2xl mx-auto px-8 py-16">
+            <div class="flex flex-col md:flex-row items-start md:items-end justify-between mb-8 gap-4">
+                <div>
+                    <h2 class="section-header text-pureblack">Global Command Center</h2>
+                    <p class="text-gray-500 mt-2 text-lg">Real-time overview of network health and active mitigations.</p>
+                </div>
+                
+                <div class="flex items-center gap-x-4 bg-white border border-gray-200 px-4 py-2 rounded-xl shadow-sm">
+                    <div class="text-right">
+                        <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">System Status</div>
+                        <div class="font-mono text-sm text-pureblack font-bold flex items-center gap-x-2">
+                            <div class="w-2 h-2 bg-turquoise rounded-full animate-pulse"></div>
+                            Online & Monitoring
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
+                <div class="metric-card rounded-2xl p-6 shadow-sm border-2">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Active Queries</div>
+                            <div class="text-4xl font-display font-bold text-pureblack tabular-nums">47,892</div>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-pureblack text-xl">
+                            <i class="fa-solid fa-globe"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center text-sm font-bold text-turquoise-dark">
+                        <i class="fa-solid fa-arrow-trend-up mr-2"></i> +312 today
+                    </div>
+                </div>
+                
+                <div class="metric-card rounded-2xl p-6 shadow-sm border-2">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Hijacks Neutralized</div>
+                            <div id="hijacks-blocked-stat" class="text-4xl font-display font-bold text-pureblack tabular-nums">12,481</div>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-turquoise-light flex items-center justify-center text-turquoise-dark text-xl">
+                            <i class="fa-solid fa-shield-virus"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center text-sm font-bold text-turquoise-dark">
+                        <i class="fa-solid fa-check mr-2"></i> 99.9% success rate
+                    </div>
+                </div>
+                
+                <div class="metric-card rounded-2xl p-6 shadow-sm border-2">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Analyst Hours Saved</div>
+                            <div id="time-saved" class="text-4xl font-display font-bold text-pureblack tabular-nums">6,842</div>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-pureblack text-xl">
+                            <i class="fa-solid fa-clock"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center text-sm font-bold text-gray-500">
+                        <i class="fa-solid fa-arrow-trend-up mr-2 text-pureblack"></i> Based on 30m per hijack
+                    </div>
+                </div>
+                
+                <div class="metric-card rounded-2xl p-6 shadow-sm border-2 border-pureblack relative overflow-hidden">
+                    <div class="absolute right-0 top-0 w-24 h-24 bg-turquoise opacity-20 rounded-bl-full"></div>
+                    <div class="flex justify-between items-start relative z-10">
+                        <div>
+                            <div class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Data Integrity</div>
+                            <div class="text-4xl font-display font-bold text-pureblack tabular-nums">99.4%</div>
+                        </div>
+                        <div class="w-12 h-12 rounded-full bg-pureblack flex items-center justify-center text-turquoise text-xl">
+                            <i class="fa-solid fa-gem"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center text-sm font-bold text-pureblack relative z-10">
+                        <i class="fa-solid fa-arrow-trend-up mr-2 text-turquoise-dark"></i> Optimized for Meltwater
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Active Queries Table -->
+            <div class="bg-white border-2 border-gray-200 rounded-2xl overflow-hidden shadow-sm">
+                <div class="px-8 py-6 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+                    <div class="font-display font-bold text-xl text-pureblack flex items-center gap-x-3">
+                        <i class="fa-solid fa-list-ul text-turquoise-dark"></i>
+                        Live Detection Feed
+                    </div>
+                    <div class="flex gap-3">
+                        <span class="text-xs bg-white border border-gray-200 px-3 py-1.5 rounded-full text-gray-600 font-bold uppercase tracking-widest shadow-sm">Auto-updating</span>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-white text-xs font-bold text-gray-500 uppercase tracking-wider border-b-2 border-gray-100">
+                            <tr>
+                                <th class="px-8 py-5">Brand / Keyword</th>
+                                <th class="px-6 py-5">Current Vol.</th>
+                                <th class="px-6 py-5">Status</th>
+                                <th class="px-6 py-5">NLP Confidence</th>
+                                <th class="px-8 py-5 text-right">Action Taken</th>
+                            </tr>
+                        </thead>
+                        <tbody id="queries-table-body" class="divide-y divide-gray-100 font-medium">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 5. ANALYTICS SECTION -->
+        <!-- ========================================== -->
+        <div id="analytics-section" class="section-page max-w-screen-2xl mx-auto px-8 py-16">
+            <div class="flex items-end justify-between mb-10">
+                <div>
+                    <h2 class="section-header text-pureblack">Performance Analytics</h2>
+                    <p class="text-gray-500 mt-2 text-lg">Historical view of noise reduction and system efficiency.</p>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 bg-white border-2 border-gray-200 rounded-2xl p-8 shadow-sm">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <div class="font-display font-bold text-xl text-pureblack">Volume Intercepted (Last 7 Days)</div>
+                            <div class="text-sm font-medium text-gray-500 mt-1">Noise blocked vs legitimate brand mentions</div>
+                        </div>
+                    </div>
+                    <div class="relative h-[300px] w-full">
+                        <canvas id="performance-chart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="space-y-6">
+                    <div class="bg-pureblack rounded-2xl p-8 text-white shadow-black relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-turquoise opacity-20 rounded-bl-full"></div>
+                        <div class="uppercase text-xs tracking-widest font-bold text-gray-400 mb-6">Top Noise Categories</div>
+                        
+                        <div class="space-y-5 relative z-10">
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <div class="flex items-center gap-x-3 text-sm font-bold">
+                                        <div class="w-3 h-3 bg-turquoise rounded-sm"></div>
+                                        Pop Culture / Entertainment
+                                    </div>
+                                    <div class="font-mono text-sm font-bold">42%</div>
+                                </div>
+                                <div class="w-full bg-gray-800 h-1.5 rounded-full"><div class="bg-turquoise h-1.5 rounded-full w-[42%]"></div></div>
+                            </div>
+                            
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <div class="flex items-center gap-x-3 text-sm font-bold">
+                                        <div class="w-3 h-3 bg-white rounded-sm"></div>
+                                        Generic Dictionary Overlap
+                                    </div>
+                                    <div class="font-mono text-sm font-bold">31%</div>
+                                </div>
+                                <div class="w-full bg-gray-800 h-1.5 rounded-full"><div class="bg-white h-1.5 rounded-full w-[31%]"></div></div>
+                            </div>
+                            
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <div class="flex items-center gap-x-3 text-sm font-bold">
+                                        <div class="w-3 h-3 bg-gray-500 rounded-sm"></div>
+                                        Spam & Bot Networks
+                                    </div>
+                                    <div class="font-mono text-sm font-bold">18%</div>
+                                </div>
+                                <div class="w-full bg-gray-800 h-1.5 rounded-full"><div class="bg-gray-500 h-1.5 rounded-full w-[18%]"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-turquoise-light border border-turquoise rounded-2xl p-8 text-center flex flex-col justify-center items-center h-40">
+                        <div class="text-sm font-bold text-turquoise-dark uppercase tracking-widest mb-2">Auto-Generated Boolean Rules</div>
+                        <div class="text-5xl font-display font-bold tabular-nums tracking-tighter text-pureblack">14,892</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="bg-pureblack text-white py-12 text-center border-t-4 border-turquoise mt-auto">
+        <div class="max-w-screen-2xl mx-auto px-8">
+            <div class="flex items-center justify-center gap-x-3 mb-6">
+                <i class="fa-solid fa-shield-halved text-turquoise text-2xl"></i>
+                <span class="font-display text-2xl font-bold">PureStream</span>
+            </div>
+            <p class="text-sm text-gray-400 font-medium">Intelligent Real-Time Data Sanitation layer for modern media intelligence.</p>
+        </div>
+    </footer>
+
+    <!-- INTERACTIVE JAVASCRIPT -->
+    <script>
+        // --- 1. SPA NAVIGATION LOGIC ---
+        let chartInitialized = false;
+
+        function switchTab(tabId) {
+            // Hide all pages
+            document.querySelectorAll('.section-page').forEach(el => el.classList.remove('active'));
+            // Remove active state from nav buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // Show selected page
+            document.getElementById(tabId).classList.add('active');
+            
+            // Highlight nav item (if it exists)
+            const navBtn = document.getElementById(`nav-${tabId}`);
+            if(navBtn) navBtn.classList.add('active');
+
+            // Scroll to top
+            window.scrollTo(0, 0);
+
+            // Initialize chart if we switch to Analytics for the first time
+            if (tabId === 'analytics-section' && !chartInitialized) {
+                initChart();
+                chartInitialized = true;
+            }
+        }
+
+        // --- 2. TOAST NOTIFICATION SYSTEM ---
+        function showToast(message, icon = 'fa-check-circle', color = '#00E5FF') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.style.borderLeftColor = color;
+            toast.innerHTML = `<i class="fa-solid ${icon}" style="color: ${color}; font-size: 18px;"></i> <span>${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }, 3000);
+        }
+
+        // --- 3. EXAMPLE TASK RESOLUTION & LOGGING LOGIC ---
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        function resolveExampleTask(id, originalVol, normalVol, exclusionRule) {
+            const card = document.getElementById(`example-${id}`);
+            const btn = document.getElementById(`btn-${id}`);
+            const bar = document.getElementById(`${id}-bar`);
+            const volText = document.getElementById(`${id}-volume`);
+            const badge = document.getElementById(`${id}-badge`);
+            const trigger = document.getElementById(`${id}-trigger`);
+            const multiplier = document.getElementById(`${id}-multiplier`);
+            const conf = document.getElementById(`${id}-confidence`);
+            
+            const logContainer = document.getElementById('execution-log');
+            const emptyMsg = document.getElementById('empty-log-msg');
+            if(emptyMsg) emptyMsg.remove();
+
+            // Disable button immediately
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Processing...`;
+            btn.classList.replace('bg-turquoise', 'bg-gray-700');
+            btn.classList.replace('hover:bg-white', 'text-white');
+
+            // Simulate processing time
+            setTimeout(() => {
+                // UI Changes to Card
+                card.classList.replace('bg-gray-900', 'bg-pureblack');
+                card.style.borderColor = '#00E5FF';
+                card.style.boxShadow = '0 0 20px rgba(0, 229, 255, 0.15)';
+
+                // Animate volume down to normal
+                animateValue(volText, originalVol, normalVol, 1500);
+                
+                bar.style.width = '5%';
+                bar.style.backgroundColor = '#00E5FF';
+
+                badge.className = 'px-3 py-1 bg-turquoise text-pureblack text-xs rounded font-bold uppercase tracking-wide';
+                badge.innerText = 'Sanitized';
+
+                multiplier.innerText = 'Normalized';
+                multiplier.className = 'text-turquoise font-bold';
+                conf.innerText = '99%';
+                conf.className = 'font-mono text-turquoise font-bold ml-1';
+
+                trigger.innerHTML = `
+                    <div class="font-mono text-[11px] text-turquoise uppercase font-bold mb-1"><i class="fa-solid fa-check-double mr-1"></i> Resolution:</div>
+                    <div class="text-white font-medium">Noise filtered. Boolean exclusion applied automatically. Dashboard updated.</div>
+                `;
+                trigger.classList.replace('bg-gray-800', 'bg-gray-900');
+                trigger.style.borderColor = '#00E5FF';
+
+                btn.innerHTML = `<i class="fa-solid fa-check"></i> RESOLVED`;
+                btn.classList.replace('bg-gray-700', 'bg-turquoise');
+                btn.classList.replace('text-white', 'text-pureblack');
+                btn.style.opacity = '0.5';
+
+                // --- APPEND DETAILED EXPLANATION TO LOG ---
+                const timestamp = new Date().toLocaleTimeString();
+                const logEntry = document.createElement('div');
+                logEntry.className = 'log-entry bg-gray-50 border border-gray-200 rounded p-4 text-gray-700';
+                
+                const timeSaved = (originalVol / 100000).toFixed(1); // Mock calculation
+                
+                logEntry.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="text-xs font-bold text-gray-500 uppercase">Task ID: #${Math.floor(Math.random() * 90000) + 10000} • Target: ${id.toUpperCase()}</div>
+                        <div class="text-xs text-gray-400">${timestamp}</div>
+                    </div>
+                    <div class="mb-1"><span class="font-bold">1. Interception:</span> Analyzed spike of <span class="text-red-500 font-bold">${formatNumber(originalVol)} mentions</span> against historical baseline of ${normalVol}.</div>
+                    <div class="mb-1"><span class="font-bold">2. NLP Engine Analysis:</span> Severe contextual mismatch detected. Content drifted from core brand ontology.</div>
+                    <div class="mb-2"><span class="font-bold">3. Rule Generation:</span> System synthesized optimal exclusion query: <code class="bg-gray-200 px-1 py-0.5 rounded text-pureblack">${exclusionRule}</code></div>
+                    <div class="text-turquoise-dark font-bold bg-turquoise-light px-3 py-2 rounded">
+                        > ACTION EXECUTED: Rule deployed to live stream. ${formatNumber(originalVol - normalVol)} irrelevant mentions permanently stripped. Dashboard restored to clean state. Analyst time saved: ~${timeSaved} hours.
+                    </div>
+                `;
+                
+                logContainer.prepend(logEntry);
+
+                // Increment global stats
+                updateGlobalStats();
+                showToast(`${id.charAt(0).toUpperCase() + id.slice(1)} hijack neutralized successfully.`, 'fa-shield-halved');
+
+            }, 800);
+        }
+
+        function animateValue(obj, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+                const current = Math.floor(easeProgress * (end - start) + start);
+                obj.innerHTML = formatNumber(current);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                } else {
+                    obj.innerHTML = formatNumber(end);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        let baseBlocked = 98742;
+        let baseCleaned = 4200000;
+        function updateGlobalStats() {
+            baseBlocked += 1;
+            baseCleaned += Math.floor(Math.random() * 50000) + 10000; 
+            
+            document.getElementById('hero-blocked').innerText = formatNumber(baseBlocked);
+            document.getElementById('hijacks-blocked-stat').innerText = formatNumber(baseBlocked);
+            document.getElementById('hero-cleaned').innerText = (baseCleaned / 1000000).toFixed(1) + 'M';
+        }
+
+        // --- 4. LIVE TABLE LOGIC ---
+        const tableData = [
+            { brand: 'Delta Airlines', vol: '1,204', status: 'Clean', conf: '99%', risk: 'low' },
+            { brand: 'Nike Sneakers', vol: '84,921', status: 'Reviewing Spike', conf: '42%', risk: 'med' },
+            { brand: 'Tesla Autopilot', vol: '5,210', status: 'Clean', conf: '96%', risk: 'low' },
+            { brand: 'Starbucks Coffee', vol: '291,000', status: 'Hijack Blocked', conf: '5%', risk: 'high' },
+            { brand: 'Microsoft Azure', vol: '3,412', status: 'Clean', conf: '98%', risk: 'low' }
+        ];
+
+        function renderTable() {
+            const tbody = document.getElementById('queries-table-body');
+            tbody.innerHTML = '';
+            
+            tableData.forEach(row => {
+                let statusBadge, actionBtn;
+                
+                if (row.risk === 'high') {
+                    statusBadge = `<span class="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-bold rounded uppercase">Blocked</span>`;
+                    actionBtn = `<span class="text-xs font-bold text-gray-500 bg-gray-100 px-3 py-1.5 rounded"><i class="fa-solid fa-ban mr-1"></i> Filtered</span>`;
+                } else if (row.risk === 'med') {
+                    statusBadge = `<span class="px-2.5 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded uppercase animate-pulse">Pending</span>`;
+                    actionBtn = `<button class="text-xs font-bold text-pureblack bg-turquoise hover:bg-turquoise-dark px-3 py-1.5 rounded transition-colors shadow-sm">Review</button>`;
+                } else {
+                    statusBadge = `<span class="px-2.5 py-1 bg-green-100 text-green-700 text-xs font-bold rounded uppercase">Clean</span>`;
+                    actionBtn = `<span class="text-xs font-bold text-gray-400"><i class="fa-solid fa-check"></i> Active</span>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition-colors";
+                tr.innerHTML = `
+                    <td class="px-8 py-4 font-bold text-pureblack">${row.brand}</td>
+                    <td class="px-6 py-4 font-mono text-sm">${row.vol}</td>
+                    <td class="px-6 py-4">${statusBadge}</td>
+                    <td class="px-6 py-4 font-mono font-bold text-gray-600">${row.conf}</td>
+                    <td class="px-8 py-4 text-right">${actionBtn}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        renderTable();
+
+        setInterval(() => {
+            if(Math.random() > 0.6) {
+                const idx = Math.floor(Math.random() * tableData.length);
+                let currentVol = parseInt(tableData[idx].vol.replace(',', ''));
+                currentVol += Math.floor(Math.random() * 50) - 20; 
+                if(currentVol < 0) currentVol = 10;
+                tableData[idx].vol = formatNumber(currentVol);
+                renderTable();
+            }
+        }, 3000);
+
+        // --- 5. GLOBAL SCAN SIMULATION ---
+        function simulateGlobalDetection() {
+            const overlay = document.getElementById('scan-overlay');
+            const text = document.getElementById('scan-text');
+            overlay.style.display = 'flex';
+            
+            let dots = 0;
+            const scanInterval = setInterval(() => {
+                dots = (dots + 1) % 4;
+                text.innerText = "Analyzing 47,892 queries against baseline anomalies" + ".".repeat(dots);
+            }, 400);
+
+            setTimeout(() => {
+                clearInterval(scanInterval);
+                overlay.style.display = 'none';
+                showToast('Global scan complete. 3 anomalies automatically neutralized.', 'fa-satellite-dish');
+                
+                tableData[1].status = 'Clean';
+                tableData[1].conf = '95%';
+                tableData[1].risk = 'low';
+                tableData[1].vol = '2,100'; 
+                renderTable();
+                updateGlobalStats();
+
+            }, 2500);
+        }
+
+        // --- 6. CHART.JS INITIALIZATION ---
+        function initChart() {
+            const ctx = document.getElementById('performance-chart').getContext('2d');
+            
+            let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(0, 229, 255, 0.5)'); 
+            gradient.addColorStop(1, 'rgba(0, 229, 255, 0.0)');
+
+            const data = {
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                datasets: [{
+                    label: 'Irrelevant Noise Blocked',
+                    data: [12000, 19000, 15000, 50000, 22000, 18000, 25000],
+                    borderColor: '#00E5FF', 
+                    backgroundColor: gradient,
+                    borderWidth: 3,
+                    pointBackgroundColor: '#0A0A0A', 
+                    pointBorderColor: '#00E5FF',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    fill: true,
+                    tension: 0.4 
+                },
+                {
+                    label: 'Clean Brand Mentions',
+                    data: [8000, 8500, 9000, 8200, 9500, 7500, 8000],
+                    borderColor: '#0A0A0A', 
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    fill: false,
+                    tension: 0.4
+                }]
+            };
+
+            new Chart(ctx, {
+                type: 'line',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#6B7280',
+                                font: { family: 'Inter', weight: 'bold' },
+                                usePointStyle: true,
+                                boxWidth: 8
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#0A0A0A',
+                            titleFont: { family: 'Inter', size: 13 },
+                            bodyFont: { family: 'Inter', size: 14, weight: 'bold' },
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#F3F4F6', drawBorder: false },
+                            ticks: {
+                                color: '#9CA3AF',
+                                font: { family: 'Inter', weight: '500' },
+                                callback: function(value) { return value / 1000 + 'k'; }
+                            }
+                        },
+                        x: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: {
+                                color: '#6B7280',
+                                font: { family: 'Inter', weight: 'bold' }
+                            }
+                        }
+                    },
+                    interaction: { intersect: false, mode: 'index' },
+                }
+            });
+        }
+    </script>
+</body>
+</html>
